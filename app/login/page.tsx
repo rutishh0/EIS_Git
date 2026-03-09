@@ -31,7 +31,7 @@ export default function LoginPage() {
         <div className="instrument-panel rounded-xl p-8 backdrop-blur-sm">
           <div className="text-center mb-6">
             <h2 className="text-lg font-semibold mb-1">Welcome back</h2>
-            <p className="text-xs text-muted-foreground">Sign in to access the EIS Dashboard</p>
+            <p className="text-xs text-muted-foreground">Sign in to access the EIS Command Center</p>
           </div>
 
           <LoginForm />
