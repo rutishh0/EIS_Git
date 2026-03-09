@@ -12,10 +12,7 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        console.log("[v0] Auth attempt for username:", credentials?.username);
-        
         if (!credentials?.username || !credentials?.password) {
-          console.log("[v0] Missing credentials");
           return null;
         }
 
@@ -24,10 +21,7 @@ export const authOptions: NextAuthOptions = {
             where: { username: credentials.username },
           });
 
-          console.log("[v0] User found:", user ? "yes" : "no", user?.isActive ? "active" : "inactive");
-
           if (!user || !user.isActive) {
-            console.log("[v0] User not found or inactive");
             return null;
           }
 
@@ -36,24 +30,21 @@ export const authOptions: NextAuthOptions = {
             user.passwordHash
           );
 
-          console.log("[v0] Password valid:", isValid);
-
           if (!isValid) {
-            console.log("[v0] Invalid password");
             return null;
           }
+
+          return {
+            id: user.id,
+            name: user.displayName,
+            email: user.email,
+            role: user.role,
+            username: user.username,
+          };
         } catch (error) {
-          console.log("[v0] Database error:", error);
+          console.error("Authentication error:", error);
           return null;
         }
-
-        return {
-          id: user.id,
-          name: user.displayName,
-          email: user.email,
-          role: user.role,
-          username: user.username,
-        };
       },
     }),
   ],
