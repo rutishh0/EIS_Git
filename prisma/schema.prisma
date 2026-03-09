@@ -1,0 +1,189 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum ScorecardStatus {
+  ACTIVE
+  CLOSED
+  ON_HOLD
+}
+
+enum RagStatus {
+  C
+  G
+  A
+  R
+  NA
+}
+
+enum EisRisk {
+  NO_RISK
+  YES_CUSTOMER
+  YES_RR
+}
+
+enum Region {
+  EUROPE
+  MEA
+  APAC
+  GREATER_CHINA
+  AMERICAS
+}
+
+enum ServiceLineCategory {
+  STANDARD
+  ADDITIONAL
+}
+
+enum NotificationType {
+  EIS_APPROACHING
+  SCORECARD_OVERDUE
+  STATUS_DEGRADED
+  GATE_DUE
+}
+
+model User {
+  id            String   @id @default(cuid())
+  username      String   @unique
+  passwordHash  String   @map("password_hash")
+  displayName   String   @map("display_name")
+  email         String?  @unique
+  role          UserRole @default(VIEWER)
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  ledScorecards     Scorecard[]    @relation("EISLead")
+  auditLogs         AuditLog[]
+  notifications     Notification[]
+  updatedScorecards Scorecard[]    @relation("LastUpdatedBy")
+
+  @@map("users")
+}
+
+model Airline {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  region    Region
+  createdAt DateTime @default(now()) @map("created_at")
+
+  scorecard Scorecard?
+
+  @@map("airlines")
+}
+
+model Scorecard {
+  id              String          @id @default(cuid())
+  airlineId       String          @unique @map("airline_id")
+  engineType      String          @map("engine_type")
+  eisDate         DateTime?       @map("eis_date")
+  eisDateTbc      Boolean         @default(false) @map("eis_date_tbc")
+  eisRisk         EisRisk         @default(NO_RISK) @map("eis_risk")
+  eisLeadId       String?         @map("eis_lead_id")
+  orderDetails    String?         @map("order_details")
+  status          ScorecardStatus @default(ACTIVE)
+  lastUpdatedAt   DateTime        @default(now()) @map("last_updated_at")
+  lastUpdatedById String?         @map("last_updated_by_id")
+  createdAt       DateTime        @default(now()) @map("created_at")
+
+  airline             Airline              @relation(fields: [airlineId], references: [id], onDelete: Cascade)
+  eisLead             User?                @relation("EISLead", fields: [eisLeadId], references: [id])
+  lastUpdatedBy       User?                @relation("LastUpdatedBy", fields: [lastUpdatedById], references: [id])
+  gateReviews         GateReview[]
+  serviceLineStatuses ServiceLineStatus[]
+  auditLogs           AuditLog[]
+  notifications       Notification[]
+
+  @@map("scorecards")
+}
+
+model GateReview {
+  id          String    @id @default(cuid())
+  scorecardId String    @map("scorecard_id")
+  gateNumber  Int       @map("gate_number")
+  planDate    DateTime? @map("plan_date")
+  actualDate  DateTime? @map("actual_date")
+  outcome     String?
+
+  scorecard Scorecard @relation(fields: [scorecardId], references: [id], onDelete: Cascade)
+
+  @@unique([scorecardId, gateNumber])
+  @@map("gate_reviews")
+}
+
+model ServiceLine {
+  id           String              @id @default(cuid())
+  name         String              @unique
+  category     ServiceLineCategory
+  sortOrder    Int                 @map("sort_order")
+  guidanceText String?             @map("guidance_text") @db.Text
+
+  statuses ServiceLineStatus[]
+
+  @@map("service_lines")
+}
+
+model ServiceLineStatus {
+  id            String    @id @default(cuid())
+  scorecardId   String    @map("scorecard_id")
+  serviceLineId String    @map("service_line_id")
+  ragStatus     RagStatus @default(G) @map("rag_status")
+  statusText    String?   @map("status_text") @db.Text
+  comments      String?   @db.Text
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  scorecard   Scorecard   @relation(fields: [scorecardId], references: [id], onDelete: Cascade)
+  serviceLine ServiceLine @relation(fields: [serviceLineId], references: [id])
+
+  @@unique([scorecardId, serviceLineId])
+  @@map("service_line_statuses")
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  userId       String   @map("user_id")
+  scorecardId  String?  @map("scorecard_id")
+  action       String
+  fieldChanged String?  @map("field_changed")
+  oldValue     String?  @map("old_value") @db.Text
+  newValue     String?  @map("new_value") @db.Text
+  changedAt    DateTime @default(now()) @map("changed_at")
+
+  user      User       @relation(fields: [userId], references: [id])
+  scorecard Scorecard? @relation(fields: [scorecardId], references: [id], onDelete: SetNull)
+
+  @@index([scorecardId])
+  @@index([userId])
+  @@index([changedAt])
+  @@map("audit_logs")
+}
+
+model Notification {
+  id          String           @id @default(cuid())
+  userId      String           @map("user_id")
+  type        NotificationType
+  title       String
+  message     String           @db.Text
+  scorecardId String?          @map("scorecard_id")
+  isRead      Boolean          @default(false) @map("is_read")
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scorecard Scorecard? @relation(fields: [scorecardId], references: [id], onDelete: SetNull)
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}

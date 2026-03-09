@@ -1,0 +1,230 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+  EIS COMMAND CENTER
+  Aerospace Engineering / Cockpit Instrument Aesthetic
+  Dark graphite base with teal instrument accents
+*/
+
+:root {
+  /* Core palette - graphite/charcoal */
+  --background: #08090a;
+  --foreground: #e8eaed;
+  --card: #101214;
+  --card-foreground: #e8eaed;
+  --popover: #18191c;
+  --popover-foreground: #e8eaed;
+
+  /* Primary - teal instrument accent */
+  --primary: #00d4aa;
+  --primary-foreground: #08090a;
+
+  /* Secondary */
+  --secondary: #1a1d21;
+  --secondary-foreground: #a8adb5;
+
+  /* Muted */
+  --muted: #14161a;
+  --muted-foreground: #6b7280;
+
+  /* Accent - warm amber for highlights */
+  --accent: #f59e0b;
+  --accent-foreground: #08090a;
+
+  /* Destructive */
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+
+  /* Borders and inputs */
+  --border: #2a2d32;
+  --input: #1a1d21;
+  --ring: #00d4aa;
+
+  /* RAG Status Colors - instrument-style */
+  --rag-red: #ff4757;
+  --rag-amber: #ffa502;
+  --rag-green: #2ed573;
+  --rag-blue: #00d4aa;
+  --rag-grey: #57606f;
+
+  /* Chart Colors */
+  --chart-1: #00d4aa;
+  --chart-2: #2ed573;
+  --chart-3: #ffa502;
+  --chart-4: #ff4757;
+  --chart-5: #70a1ff;
+
+  --radius: 0.25rem;
+
+  /* Sidebar */
+  --sidebar: #0c0d0f;
+  --sidebar-foreground: #a8adb5;
+  --sidebar-primary: #00d4aa;
+  --sidebar-primary-foreground: #08090a;
+  --sidebar-accent: #1a1d21;
+  --sidebar-accent-foreground: #e8eaed;
+  --sidebar-border: #2a2d32;
+  --sidebar-ring: #00d4aa;
+
+  /* Aliases for component compatibility */
+  --panel-border: var(--border);
+  --panel-bg: var(--card);
+  --panel-bg-elevated: var(--secondary);
+  --bg-base: var(--background);
+  --text-primary: var(--foreground);
+  --text-secondary: var(--secondary-foreground);
+  --text-muted: var(--muted-foreground);
+}
+
+.dark {
+  --background: #08090a;
+  --foreground: #e8eaed;
+  --card: #101214;
+  --card-foreground: #e8eaed;
+  --popover: #18191c;
+  --popover-foreground: #e8eaed;
+  --primary: #00d4aa;
+  --primary-foreground: #08090a;
+  --secondary: #1a1d21;
+  --secondary-foreground: #a8adb5;
+  --muted: #14161a;
+  --muted-foreground: #6b7280;
+  --accent: #f59e0b;
+  --accent-foreground: #08090a;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: #2a2d32;
+  --input: #1a1d21;
+  --ring: #00d4aa;
+  --chart-1: #00d4aa;
+  --chart-2: #2ed573;
+  --chart-3: #ffa502;
+  --chart-4: #ff4757;
+  --chart-5: #70a1ff;
+  --sidebar: #0c0d0f;
+  --sidebar-foreground: #a8adb5;
+  --sidebar-primary: #00d4aa;
+  --sidebar-primary-foreground: #08090a;
+  --sidebar-accent: #1a1d21;
+  --sidebar-accent-foreground: #e8eaed;
+  --sidebar-border: #2a2d32;
+  --sidebar-ring: #00d4aa;
+
+  /* Aliases for component compatibility */
+  --panel-border: var(--border);
+  --panel-bg: var(--card);
+  --panel-bg-elevated: var(--secondary);
+  --bg-base: var(--background);
+  --text-primary: var(--foreground);
+  --text-secondary: var(--secondary-foreground);
+  --text-muted: var(--muted-foreground);
+}
+
+@theme inline {
+  --font-sans: var(--font-outfit), 'Outfit', system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), 'JetBrains Mono', monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Custom utilities */
+@layer utilities {
+  .grid-overlay {
+    background-image:
+      linear-gradient(rgba(0, 212, 170, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 212, 170, 0.03) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  .glow-teal {
+    box-shadow: 0 0 20px rgba(0, 212, 170, 0.15), 0 0 40px rgba(0, 212, 170, 0.05);
+  }
+
+  .glow-line {
+    box-shadow: inset 0 1px 0 0 rgba(0, 212, 170, 0.1);
+  }
+
+  .scan-line::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(0, 212, 170, 0.5), transparent);
+    animation: scan 4s ease-in-out infinite;
+  }
+
+  @keyframes scan {
+    0%, 100% { transform: translateY(0); opacity: 0; }
+    50% { opacity: 1; }
+    100% { transform: translateY(100vh); }
+  }
+
+  .text-gradient {
+    background: linear-gradient(135deg, #00d4aa 0%, #2ed573 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .border-glow {
+    border: 1px solid rgba(0, 212, 170, 0.2);
+  }
+
+  .instrument-panel {
+    background: linear-gradient(180deg, #101214 0%, #0c0d0f 100%);
+    border: 1px solid #2a2d32;
+  }
+
+  .data-cell {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+  }
+}
