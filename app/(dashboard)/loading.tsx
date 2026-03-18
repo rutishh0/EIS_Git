@@ -8,10 +8,10 @@ export default function DashboardLoading() {
         {[1, 2, 3, 4].map((i) => (
           <Card key={i} className="shadow-card">
             <CardContent className="flex items-center gap-4 p-6">
-              <div className="h-12 w-12 animate-pulse rounded-lg bg-gray-200" />
+              <div className="h-12 w-12 animate-pulse rounded-lg bg-muted" />
               <div className="space-y-2">
-                <div className="h-3 w-20 animate-pulse rounded bg-gray-200" />
-                <div className="h-6 w-12 animate-pulse rounded bg-gray-200" />
+                <div className="h-3 w-20 animate-pulse rounded bg-muted" />
+                <div className="h-6 w-12 animate-pulse rounded bg-muted" />
               </div>
             </CardContent>
           </Card>
@@ -21,10 +21,10 @@ export default function DashboardLoading() {
       {/* Table skeleton */}
       <Card className="shadow-card">
         <CardContent className="p-6">
-          <div className="h-5 w-40 animate-pulse rounded bg-gray-200" />
+          <div className="h-5 w-40 animate-pulse rounded bg-muted" />
           <div className="mt-4 space-y-3">
             {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-10 animate-pulse rounded bg-gray-100" />
+              <div key={i} className="h-10 animate-pulse rounded bg-muted/50" />
             ))}
           </div>
         </CardContent>

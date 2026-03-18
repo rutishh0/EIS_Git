@@ -22,9 +22,11 @@ export async function GET() {
         username: true,
         displayName: true,
         email: true,
+        jobTitle: true,
         role: true,
         isActive: true,
         createdAt: true,
+        managedAirlines: { select: { id: true, name: true } },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -41,7 +43,7 @@ export async function POST(request: NextRequest) {
     await requireAdmin();
 
     const body = await request.json();
-    const { username, displayName, email, password, role } = body;
+    const { username, displayName, email, password, role, jobTitle, managedAirlineIds } = body;
 
     if (!username || !displayName || !password) {
       return NextResponse.json(
@@ -67,15 +69,21 @@ export async function POST(request: NextRequest) {
         email: email || null,
         passwordHash,
         role: role || "VIEWER",
+        jobTitle: jobTitle || null,
+        ...(Array.isArray(managedAirlineIds) && managedAirlineIds.length > 0
+          ? { managedAirlines: { connect: managedAirlineIds.map((id: string) => ({ id })) } }
+          : {}),
       },
       select: {
         id: true,
         username: true,
         displayName: true,
         email: true,
+        jobTitle: true,
         role: true,
         isActive: true,
         createdAt: true,
+        managedAirlines: { select: { id: true, name: true } },
       },
     });
 

@@ -1,174 +1,274 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { toast } from "sonner"
+import { Upload, FileUp, AlertCircle, CheckCircle, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { Upload, History, FileSpreadsheet, CheckCircle2, AlertCircle, XCircle, RefreshCw, HardDrive, ArrowRight } from "lucide-react"
+import { PageHeader } from "@/components/eis/page-header"
 import { Button } from "@/components/ui/button"
 
+interface ImportResult {
+  airlinesCreated: number
+  scorecardsUpdated: number
+  serviceLinesMapped: number
+  errors: string[]
+  totalParsed: number
+}
+
 export function AdminImportClient() {
+  const router = useRouter()
   const [isDragging, setIsDragging] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState<number | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [result, setResult] = useState<ImportResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true) }
-  const handleDragLeave = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(false) }
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault(); setIsDragging(false)
-    const file = e.dataTransfer.files[0]
-    if (file) setSelectedFile(file)
-  }
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) setSelectedFile(file)
-  }
-
-  const handleImport = async () => {
-    if (!selectedFile) return
-    setUploadProgress(0)
-
-    const reader = new FileReader()
-    reader.onload = async () => {
-      const interval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev === null) return 0
-          if (prev >= 90) { clearInterval(interval); return 90 }
-          return prev + 10
-        })
-      }, 200)
-      try {
-        const res = await fetch('/api/import', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            files: [{ name: selectedFile.name, data: reader.result as string }]
-          }),
-        })
-        clearInterval(interval)
-        setUploadProgress(res.ok ? 100 : null)
-      } catch {
-        clearInterval(interval)
-        setUploadProgress(null)
-      }
+  function validateFile(file: File): string | null {
+    const ext = file.name.substring(file.name.lastIndexOf(".")).toLowerCase()
+    if (![".xlsx", ".xls"].includes(ext)) {
+      return "Please select a valid Excel file (.xlsx or .xls)"
     }
-    reader.onerror = () => setUploadProgress(null)
-    reader.readAsDataURL(selectedFile)
+    if (file.size > 10 * 1024 * 1024) {
+      return "File size must be under 10 MB"
+    }
+    return null
   }
 
-  const recentImports = [
-    { id: "1", filename: "EIS_Metric_Tool_2026_EMEA.xlsb", date: "01 Mar 2026", status: "success", records: 12, size: "2.4 MB" },
-    { id: "2", filename: "EIS_Metric_Tool_2026_APAC.xlsx", date: "28 Feb 2026", status: "success", records: 8, size: "1.8 MB" },
-    { id: "3", filename: "EIS_Metric_Tool_2025_Americas.xlsb", date: "20 Feb 2026", status: "partial", records: 5, size: "1.2 MB" },
-  ]
+  function handleFile(file: File) {
+    const validationError = validateFile(file)
+    if (validationError) {
+      toast.error(validationError)
+      return
+    }
+    setSelectedFile(file)
+    setResult(null)
+    setError(null)
+  }
 
-  const statusIcons = { success: CheckCircle2, partial: AlertCircle, failed: XCircle }
-  const statusColors = { success: "text-emerald-400", partial: "text-amber-400", failed: "text-red-400" }
-  const statusBg = { success: "bg-emerald-500/10", partial: "bg-amber-500/10", failed: "bg-red-500/10" }
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault()
+    setIsDragging(true)
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault()
+    setIsDragging(false)
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault()
+    setIsDragging(false)
+    const file = e.dataTransfer.files[0]
+    if (file) handleFile(file)
+  }
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (file) handleFile(file)
+  }
+
+  async function handleImport() {
+    if (!selectedFile) return
+    setUploading(true)
+    setResult(null)
+    setError(null)
+
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = () => reject(new Error("Failed to read file"))
+        reader.readAsDataURL(selectedFile)
+      })
+
+      const res = await fetch("/api/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          files: [{ name: selectedFile.name, data: base64 }],
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || "Import failed")
+      }
+
+      setResult(data)
+      toast.success(
+        `Import complete — ${data.airlinesCreated} created, ${data.scorecardsUpdated} updated`
+      )
+      router.refresh()
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Import failed"
+      setError(msg)
+      toast.error(msg)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  function reset() {
+    setSelectedFile(null)
+    setResult(null)
+    setError(null)
+  }
+
+  function formatSize(bytes: number) {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
+  }
 
   return (
     <>
-      <header className="mb-6">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-          <Link href="/" className="hover:text-foreground">Command</Link>
-          <span>/</span>
-          <span className="text-foreground">Excel Import</span>
-        </div>
-        <h1 className="text-2xl font-semibold tracking-tight">Data Import</h1>
-        <p className="text-muted-foreground text-sm mt-1">Import scorecard data from EIS Metric Tool Excel files</p>
-      </header>
+      <PageHeader
+        title="Excel Import"
+        description="Import scorecard data from EIS Metric Tool Excel files"
+      />
 
-      <div className="grid gap-6 lg:grid-cols-5">
-        <div className="lg:col-span-3 space-y-6">
+      <div className="max-w-2xl space-y-6">
+        {/* Upload Panel */}
+        <div className="rounded-lg border border-border bg-card p-6">
           {/* Drop Zone */}
-          <div className="instrument-panel p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-lg bg-teal-500/10 flex items-center justify-center"><Upload className="w-5 h-5 text-teal-400" /></div>
-              <div><h2 className="font-semibold">Upload File</h2><p className="text-sm text-muted-foreground">Import from .xlsx or .xlsb files</p></div>
-            </div>
-
-            <div onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}
-              className={cn("relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-12 transition-all",
-                isDragging ? "border-[#00d4aa] bg-[#00d4aa]/5" : "border-border hover:border-[#00d4aa]/50 hover:bg-secondary/30"
-              )}>
-              <input type="file" accept=".xlsx,.xlsb" onChange={handleFileSelect} className="absolute inset-0 cursor-pointer opacity-0" />
-              <div className={cn("w-16 h-16 rounded-full flex items-center justify-center mb-4 transition-colors", isDragging ? "bg-[#00d4aa]/20" : "bg-secondary")}>
-                <HardDrive className={cn("w-8 h-8", isDragging ? "text-[#00d4aa]" : "text-muted-foreground")} />
-              </div>
-              <p className="text-sm font-medium mb-1">{isDragging ? "Drop file here" : "Drag and drop your Excel file"}</p>
-              <p className="text-xs text-muted-foreground">or click to browse files</p>
-              <div className="flex items-center gap-4 mt-4 text-xs text-muted-foreground/60">
-                <span className="flex items-center gap-1"><FileSpreadsheet className="w-3 h-3" /> .xlsx</span>
-                <span className="flex items-center gap-1"><FileSpreadsheet className="w-3 h-3" /> .xlsb</span>
-                <span>Max 25 MB</span>
-              </div>
-            </div>
-
-            {selectedFile && (
-              <div className="mt-4 flex items-center justify-between rounded-lg bg-secondary p-4 border border-border">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center"><FileSpreadsheet className="w-5 h-5 text-emerald-400" /></div>
-                  <div><p className="font-medium text-sm">{selectedFile.name}</p><p className="text-xs text-muted-foreground">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p></div>
-                </div>
-                <Button variant="ghost" size="sm" onClick={() => { setSelectedFile(null); setUploadProgress(null) }} className="text-muted-foreground hover:text-foreground">Remove</Button>
-              </div>
+          <div
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={cn(
+              "relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-12 transition-colors",
+              isDragging
+                ? "border-primary bg-primary/5"
+                : "border-border hover:border-primary/50"
             )}
+          >
+            <input
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleFileSelect}
+              className="absolute inset-0 cursor-pointer opacity-0"
+            />
+            <Upload
+              className={cn(
+                "mb-4 h-10 w-10",
+                isDragging ? "text-primary" : "text-muted-foreground"
+              )}
+            />
+            <p className="text-sm font-medium">
+              {isDragging
+                ? "Drop your file here"
+                : "Drag and drop your Excel file"}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              .xlsx or .xls — max 10 MB
+            </p>
+          </div>
 
-            {uploadProgress !== null && (
-              <div className="mt-4 space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{uploadProgress < 100 ? "Processing file..." : "Import complete"}</span>
-                  <span className="font-mono text-[#00d4aa]">{uploadProgress}%</span>
-                </div>
-                <div className="h-2 rounded-full bg-secondary overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-teal-600 to-cyan-500 transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+          {/* Selected File Info */}
+          {selectedFile && !result && (
+            <div className="mt-4 flex items-center justify-between rounded-lg border border-border bg-secondary/50 p-4">
+              <div className="flex items-center gap-3">
+                <FileUp className="h-5 w-5 shrink-0 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">{selectedFile.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatSize(selectedFile.size)}
+                  </p>
                 </div>
               </div>
-            )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={reset}
+                disabled={uploading}
+              >
+                Remove
+              </Button>
+            </div>
+          )}
 
-            <Button onClick={handleImport} disabled={!selectedFile || (uploadProgress !== null && uploadProgress < 100)}
-              className="w-full mt-4 gap-2 bg-[#00d4aa] hover:bg-[#00d4aa]/90 text-[#08090a] disabled:opacity-50">
-              {uploadProgress !== null && uploadProgress < 100 ? <><RefreshCw className="w-4 h-4 animate-spin" /> Importing...</> : <><ArrowRight className="w-4 h-4" /> Start Import</>}
+          {/* Import Button */}
+          {selectedFile && !result && (
+            <Button
+              onClick={handleImport}
+              disabled={uploading}
+              className="mt-4 w-full gap-2"
+            >
+              {uploading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Importing…
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4" />
+                  Import
+                </>
+              )}
             </Button>
-          </div>
+          )}
 
-          {/* Requirements */}
-          <div className="instrument-panel p-4">
-            <h3 className="text-xs text-muted-foreground uppercase tracking-wider mb-3">File Requirements</h3>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              {["Use the official EIS Metric Tool template", "Ensure all required columns are present", "Data will be validated before import", "Existing records will be updated, new ones created"].map((req, idx) => (
-                <li key={idx} className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" /> {req}</li>
-              ))}
-            </ul>
-          </div>
+          {/* Success Result */}
+          {result && (
+            <div className="mt-4 space-y-3">
+              <div className="flex items-start gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4">
+                <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" />
+                <div>
+                  <p className="font-medium text-emerald-400">
+                    Import Successful
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Processed {result.totalParsed} airline
+                    {result.totalParsed !== 1 ? "s" : ""} —{" "}
+                    {result.airlinesCreated} created, {result.scorecardsUpdated}{" "}
+                    updated, {result.serviceLinesMapped} service lines mapped.
+                  </p>
+                  {result.errors.length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-xs font-medium text-amber-400">
+                        {result.errors.length} warning
+                        {result.errors.length !== 1 ? "s" : ""}:
+                      </p>
+                      <ul className="mt-1 space-y-1 text-xs text-muted-foreground">
+                        {result.errors.map((e, i) => (
+                          <li key={i}>• {e}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <Button variant="outline" onClick={reset} className="w-full">
+                Import Another File
+              </Button>
+            </div>
+          )}
+
+          {/* Error */}
+          {error && !result && (
+            <div className="mt-4 flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4">
+              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+              <div>
+                <p className="font-medium text-destructive">Import Failed</p>
+                <p className="mt-1 text-sm text-muted-foreground">{error}</p>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Import History */}
-        <div className="lg:col-span-2">
-          <div className="instrument-panel p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold flex items-center gap-2"><History className="w-4 h-4 text-muted-foreground" /> Import History</h2>
-            </div>
-            <div className="space-y-3">
-              {recentImports.map(item => {
-                const StatusIcon = statusIcons[item.status as keyof typeof statusIcons]
-                return (
-                  <div key={item.id} className="rounded-lg bg-secondary/50 p-3 border border-border/50">
-                    <div className="flex items-start gap-3">
-                      <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0", statusBg[item.status as keyof typeof statusBg])}>
-                        <StatusIcon className={cn("w-4 h-4", statusColors[item.status as keyof typeof statusColors])} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{item.filename}</p>
-                        <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                          <span>{item.date}</span><span>·</span><span>{item.records} records</span><span>·</span><span>{item.size}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
+        {/* Audit Log Link */}
+        <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+          View import history in the{" "}
+          <Link
+            href="/admin/audit-log"
+            className="font-medium text-primary hover:underline"
+          >
+            Audit Log
+          </Link>
+          .
         </div>
       </div>
     </>

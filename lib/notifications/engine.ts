@@ -10,23 +10,27 @@ export async function generateNotifications() {
     include: {
       airline: true,
       eisLead: true,
-      gateReviews: true,
+      serviceLineStatuses: true,
     },
   });
 
-  // Get all admins + editors for notifications
-  const recipients = await prisma.user.findMany({
+  const adminEditors = await prisma.user.findMany({
     where: { isActive: true, role: { in: ["ADMIN", "EDITOR"] } },
     select: { id: true },
   });
 
   for (const sc of scorecards) {
-    const recipientIds = recipients.map((r) => r.id);
-    if (sc.eisLead && !recipientIds.includes(sc.eisLead.id)) {
-      recipientIds.push(sc.eisLead.id);
+    const fallbackIds = adminEditors.map((u) => u.id);
+    const hasLead = sc.eisLeadId && sc.eisLead;
+
+    function getRecipientIds(): string[] {
+      if (hasLead) {
+        return [sc.eisLeadId!];
+      }
+      return fallbackIds;
     }
 
-    // EIS Approaching: 12, 9, 6, 3 month thresholds
+    // --- EIS_APPROACHING: 12, 9, 6, 3 month thresholds ---
     if (sc.eisDate) {
       const thresholds = [12, 9, 6, 3];
       for (const months of thresholds) {
@@ -44,7 +48,7 @@ export async function generateNotifications() {
               },
             });
             if (!existing) {
-              for (const userId of recipientIds) {
+              for (const userId of getRecipientIds()) {
                 await prisma.notification.create({
                   data: {
                     userId,
@@ -59,13 +63,13 @@ export async function generateNotifications() {
             } else {
               results.skipped++;
             }
-            break; // Only send for the nearest threshold
+            break;
           }
         }
       }
     }
 
-    // Scorecard Overdue: not updated in 30+ days
+    // --- SCORECARD_OVERDUE: not updated in 30+ days ---
     const daysSinceUpdate = differenceInDays(now, sc.lastUpdatedAt);
     if (daysSinceUpdate > 30) {
       const title = `Overdue: ${sc.airline.name}`;
@@ -78,7 +82,7 @@ export async function generateNotifications() {
         },
       });
       if (!existing) {
-        for (const userId of recipientIds) {
+        for (const userId of getRecipientIds()) {
           await prisma.notification.create({
             data: {
               userId,
@@ -95,37 +99,68 @@ export async function generateNotifications() {
       }
     }
 
-    // Gate Review Due: plan date within 30 days
-    for (const gate of sc.gateReviews) {
-      if (gate.planDate && !gate.actualDate) {
-        const daysUntilGate = differenceInDays(gate.planDate, now);
-        if (daysUntilGate >= 0 && daysUntilGate <= 30) {
-          const title = `Gate ${gate.gateNumber} due: ${sc.airline.name}`;
-          const existing = await prisma.notification.findFirst({
-            where: {
-              scorecardId: sc.id,
-              type: "GATE_DUE",
+    // --- OFF_PLAN: RED service lines with EIS within 180 days ---
+    if (sc.eisDate) {
+      const daysUntilEis = differenceInDays(sc.eisDate, now);
+      const hasRedLines = sc.serviceLineStatuses.some(
+        (sls) => sls.ragStatus === "R"
+      );
+
+      if (hasRedLines && daysUntilEis > 0 && daysUntilEis <= 180) {
+        const title = `Off Plan: ${sc.airline.name}`;
+        const existing = await prisma.notification.findFirst({
+          where: {
+            scorecardId: sc.id,
+            type: "OFF_PLAN",
+            title,
+            createdAt: { gte: addMonths(now, -1) },
+          },
+        });
+        if (!existing) {
+          if (hasLead) {
+            await prisma.notification.create({
+              data: {
+                userId: sc.eisLeadId!,
+                type: "OFF_PLAN",
+                title,
+                message: `${sc.airline.name} has RED service lines with EIS in ${daysUntilEis} days.`,
+                scorecardId: sc.id,
+              },
+            });
+            results.created++;
+          }
+        } else {
+          results.skipped++;
+        }
+      }
+    }
+
+    // --- PAST_EIS: eisDate has passed but scorecard still active ---
+    if (sc.eisDate && isBefore(sc.eisDate, now)) {
+      const title = `Past EIS: ${sc.airline.name}`;
+      const existing = await prisma.notification.findFirst({
+        where: {
+          scorecardId: sc.id,
+          type: "PAST_EIS",
+          title,
+          createdAt: { gte: addMonths(now, -1) },
+        },
+      });
+      if (!existing) {
+        if (hasLead) {
+          await prisma.notification.create({
+            data: {
+              userId: sc.eisLeadId!,
+              type: "PAST_EIS",
               title,
-              createdAt: { gte: addMonths(now, -1) },
+              message: `${sc.airline.name} has passed its EIS date. Please update or close the scorecard.`,
+              scorecardId: sc.id,
             },
           });
-          if (!existing) {
-            for (const userId of recipientIds) {
-              await prisma.notification.create({
-                data: {
-                  userId,
-                  type: "GATE_DUE",
-                  title,
-                  message: `Gate ${gate.gateNumber} review for ${sc.airline.name} is due in ${daysUntilGate} days.`,
-                  scorecardId: sc.id,
-                },
-              });
-              results.created++;
-            }
-          } else {
-            results.skipped++;
-          }
+          results.created++;
         }
+      } else {
+        results.skipped++;
       }
     }
   }

@@ -12,18 +12,31 @@ export default async function UsersPage() {
     redirect("/");
   }
 
-  const users = await prisma.user.findMany({
-    select: {
-      id: true,
-      username: true,
-      displayName: true,
-      email: true,
-      role: true,
-      isActive: true,
-      createdAt: true,
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const [users, airlines] = await Promise.all([
+    prisma.user.findMany({
+      select: {
+        id: true,
+        username: true,
+        displayName: true,
+        email: true,
+        jobTitle: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+        managedAirlines: { select: { id: true, name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.airline.findMany({
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+  ]);
 
-  return <AdminUsersClient users={JSON.parse(JSON.stringify(users))} />;
+  return (
+    <AdminUsersClient
+      users={JSON.parse(JSON.stringify(users))}
+      airlines={JSON.parse(JSON.stringify(airlines))}
+    />
+  );
 }

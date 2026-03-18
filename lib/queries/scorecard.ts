@@ -6,7 +6,6 @@ export async function getAllAirlines() {
       airline: true,
       eisLead: { select: { displayName: true } },
       serviceLineStatuses: { select: { ragStatus: true } },
-      gateReviews: { orderBy: { gateNumber: "asc" } },
     },
     orderBy: { airline: { name: "asc" } },
   });
@@ -23,10 +22,6 @@ export async function getAllAirlines() {
     status: sc.status,
     lastUpdatedAt: sc.lastUpdatedAt,
     ragStatuses: sc.serviceLineStatuses.map((s) => s.ragStatus),
-    gateReviews: sc.gateReviews.map((gr) => ({
-      gateNumber: gr.gateNumber,
-      outcome: gr.outcome,
-    })),
   }));
 }
 
@@ -37,7 +32,6 @@ export async function getScorecardByAirlineId(airlineId: string) {
       airline: true,
       eisLead: { select: { id: true, displayName: true } },
       lastUpdatedBy: { select: { displayName: true } },
-      gateReviews: { orderBy: { gateNumber: "asc" } },
       serviceLineStatuses: {
         include: { serviceLine: true },
         orderBy: { serviceLine: { sortOrder: "asc" } },
@@ -56,30 +50,19 @@ export async function getScorecardByAirlineId(airlineId: string) {
     eisDate: scorecard.eisDate,
     eisDateTbc: scorecard.eisDateTbc,
     eisRisk: scorecard.eisRisk,
-    eisLead: scorecard.eisLead
-      ? { id: scorecard.eisLead.id, name: scorecard.eisLead.displayName }
-      : null,
+    eisLeadName: scorecard.eisLead?.displayName ?? null,
     orderDetails: scorecard.orderDetails,
     status: scorecard.status,
     lastUpdatedAt: scorecard.lastUpdatedAt,
-    lastUpdatedBy: scorecard.lastUpdatedBy?.displayName || null,
-    gateReviews: scorecard.gateReviews.map((gr) => ({
-      id: gr.id,
-      gateNumber: gr.gateNumber,
-      planDate: gr.planDate,
-      actualDate: gr.actualDate,
-      outcome: gr.outcome,
-    })),
-    serviceLines: scorecard.serviceLineStatuses.map((sls) => ({
+    serviceLineStatuses: scorecard.serviceLineStatuses.map((sls) => ({
       id: sls.id,
-      serviceLineId: sls.serviceLineId,
-      name: sls.serviceLine.name,
-      category: sls.serviceLine.category,
-      guidanceText: sls.serviceLine.guidanceText,
+      serviceLineName: sls.serviceLine.name,
+      serviceLineCategory: sls.serviceLine.category,
       ragStatus: sls.ragStatus,
       statusText: sls.statusText,
       comments: sls.comments,
-      updatedAt: sls.updatedAt,
+      isDisputed: sls.isDisputed,
+      disputeNote: sls.disputeNote,
     })),
   };
 }

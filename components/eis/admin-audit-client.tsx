@@ -2,182 +2,360 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import {
+  Clock,
+  Edit,
+  Plus,
+  Trash2,
+  Upload as ImportIcon,
+  FileText,
+  Search,
+  ArrowRight,
+} from "lucide-react"
 import { cn } from "@/lib/utils"
-import { Clock, History, Search, Filter, Edit, Plus, Trash2, Shield, FileSpreadsheet, ArrowRight, ChevronDown } from "lucide-react"
+import { PageHeader } from "@/components/eis/page-header"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 interface AuditLog {
   id: string
-  user: string
-  airline: string
   action: string
   fieldChanged: string | null
   oldValue: string | null
   newValue: string | null
   changedAt: string
+  user: { displayName: string }
+  scorecard?: { airline: { name: string } } | null
 }
 
-interface Props {
+interface AdminAuditClientProps {
   logs: AuditLog[]
   page: number
   totalPages: number
   total: number
 }
 
-const actionConfig: Record<string, { icon: typeof Edit; color: string; bg: string; label: string }> = {
-  update: { icon: Edit, color: "text-cyan-400", bg: "bg-cyan-500/10", label: "Update" },
-  create: { icon: Plus, color: "text-emerald-400", bg: "bg-emerald-500/10", label: "Create" },
-  delete: { icon: Trash2, color: "text-red-400", bg: "bg-red-500/10", label: "Delete" },
-  import: { icon: FileSpreadsheet, color: "text-amber-400", bg: "bg-amber-500/10", label: "Import" },
-  role_change: { icon: Shield, color: "text-violet-400", bg: "bg-violet-500/10", label: "Role Change" },
+const actionConfig: Record<
+  string,
+  { icon: typeof Edit; color: string; bg: string; label: string }
+> = {
+  update: {
+    icon: Edit,
+    color: "text-blue-400",
+    bg: "bg-blue-500/10",
+    label: "Update",
+  },
+  create: {
+    icon: Plus,
+    color: "text-emerald-400",
+    bg: "bg-emerald-500/10",
+    label: "Create",
+  },
+  import: {
+    icon: ImportIcon,
+    color: "text-purple-400",
+    bg: "bg-purple-500/10",
+    label: "Import",
+  },
+  delete: {
+    icon: Trash2,
+    color: "text-red-400",
+    bg: "bg-red-500/10",
+    label: "Delete",
+  },
 }
 
-const filterOptions = [
-  { value: "all", label: "All" },
-  { value: "update", label: "Updates" },
-  { value: "create", label: "Creates" },
-  { value: "delete", label: "Deletes" },
-  { value: "import", label: "Imports" },
-]
+function getActionKey(action: string): string {
+  const lower = action.toLowerCase()
+  if (lower.includes("import")) return "import"
+  if (lower.includes("create")) return "create"
+  if (lower.includes("delete")) return "delete"
+  if (lower.includes("update")) return "update"
+  return "update"
+}
 
-export function AdminAuditClient({ logs, page, totalPages, total }: Props) {
-  const [searchQuery, setSearchQuery] = useState("")
+function formatTimestamp(ts: string) {
+  const d = new Date(ts)
+  return {
+    date: d.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    }),
+    time: d.toLocaleTimeString("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
+  }
+}
+
+export function AdminAuditClient({
+  logs,
+  page,
+  totalPages,
+  total,
+}: AdminAuditClientProps) {
+  const [search, setSearch] = useState("")
   const [actionFilter, setActionFilter] = useState("all")
 
-  const filtered = logs.filter(log => {
-    if (searchQuery) {
-      const search = searchQuery.toLowerCase()
-      if (!log.user.toLowerCase().includes(search) && !log.airline.toLowerCase().includes(search) && !(log.fieldChanged || '').toLowerCase().includes(search)) return false
+  const filtered = logs.filter((log) => {
+    const key = getActionKey(log.action)
+    if (actionFilter !== "all" && key !== actionFilter) return false
+    if (search) {
+      const q = search.toLowerCase()
+      const user = log.user.displayName.toLowerCase()
+      const airline = (log.scorecard?.airline?.name || "").toLowerCase()
+      const field = (log.fieldChanged || "").toLowerCase()
+      if (!user.includes(q) && !airline.includes(q) && !field.includes(q))
+        return false
     }
-    if (actionFilter !== "all" && log.action !== actionFilter) return false
     return true
   })
 
-  const formatTimestamp = (ts: string) => {
-    const date = new Date(ts)
-    return {
-      date: date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
-      time: date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
-    }
-  }
-
-  const updateCount = logs.filter(l => l.action === "update").length
-  const createCount = logs.filter(l => l.action === "create").length
-  const importCount = logs.filter(l => l.action === "import").length
+  const updateCount = logs.filter(
+    (l) => getActionKey(l.action) === "update"
+  ).length
+  const createCount = logs.filter(
+    (l) => getActionKey(l.action) === "create"
+  ).length
+  const importCount = logs.filter(
+    (l) => getActionKey(l.action) === "import"
+  ).length
 
   return (
     <>
-      <header className="mb-6">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-          <Link href="/" className="hover:text-foreground">Command</Link><span>/</span><span className="text-foreground">Audit Log</span>
-        </div>
-        <h1 className="text-2xl font-semibold tracking-tight">Audit Log</h1>
-        <p className="text-muted-foreground text-sm mt-1">Complete history of all system changes</p>
-      </header>
+      <PageHeader
+        title="Audit Log"
+        description="Complete history of all system changes"
+      />
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
         {[
-          { label: "Total Events", value: total, color: "text-foreground" },
-          { label: "Updates", value: updateCount, color: "text-cyan-400" },
-          { label: "Creates", value: createCount, color: "text-emerald-400" },
-          { label: "Imports", value: importCount, color: "text-amber-400" },
-        ].map(stat => (
-          <div key={stat.label} className="instrument-panel p-4">
-            <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">{stat.label}</div>
-            <div className={cn("text-2xl font-mono font-semibold", stat.color)}>{stat.value}</div>
+          {
+            label: "Total Entries",
+            value: total,
+            color: "text-foreground",
+          },
+          {
+            label: "Updates",
+            value: updateCount,
+            color: "text-blue-400",
+          },
+          {
+            label: "Creates",
+            value: createCount,
+            color: "text-emerald-400",
+          },
+          {
+            label: "Imports",
+            value: importCount,
+            color: "text-purple-400",
+          },
+        ].map((s) => (
+          <div
+            key={s.label}
+            className="rounded-lg border border-border bg-card p-4"
+          >
+            <p className="text-xs text-muted-foreground">{s.label}</p>
+            <p
+              className={cn(
+                "text-2xl font-semibold tabular-nums",
+                s.color
+              )}
+            >
+              {s.value}
+            </p>
           </div>
         ))}
       </div>
 
       {/* Filters */}
-      <div className="instrument-panel p-4 mb-6">
-        <div className="flex items-center gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input placeholder="Search by user, target, or field..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-              className="pl-10 bg-secondary border-border" />
-          </div>
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-muted-foreground" />
-            <div className="flex gap-1">
-              {filterOptions.map(option => (
-                <button key={option.value} onClick={() => setActionFilter(option.value)}
-                  className={cn("px-3 py-1.5 text-xs rounded transition-colors",
-                    actionFilter === option.value ? "bg-[#00d4aa] text-[#08090a]" : "bg-secondary text-muted-foreground hover:text-foreground"
-                  )}>{option.label}</button>
-              ))}
-            </div>
-          </div>
+      <div className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-4">
+        <div className="relative min-w-[200px] flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            className="pl-9"
+            placeholder="Search by user, airline, or field…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
-        <div className="mt-3 pt-3 border-t border-border/50">
-          <p className="text-xs text-muted-foreground">Showing <span className="text-foreground font-medium">{filtered.length}</span> of <span className="text-foreground font-medium">{total}</span> entries</p>
-        </div>
+        <Select value={actionFilter} onValueChange={setActionFilter}>
+          <SelectTrigger className="w-[140px]">
+            <SelectValue placeholder="All actions" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Actions</SelectItem>
+            <SelectItem value="update">Updates</SelectItem>
+            <SelectItem value="create">Creates</SelectItem>
+            <SelectItem value="import">Imports</SelectItem>
+            <SelectItem value="delete">Deletes</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="ml-auto text-xs text-muted-foreground">
+          Showing{" "}
+          <span className="font-medium text-foreground">
+            {filtered.length}
+          </span>{" "}
+          of <span className="font-medium text-foreground">{total}</span>{" "}
+          entries
+        </p>
       </div>
 
       {/* Timeline */}
-      <div className="instrument-panel overflow-hidden">
-        <div className="p-4 border-b border-border">
-          <h3 className="font-semibold flex items-center gap-2"><History className="w-4 h-4 text-muted-foreground" /> Activity Timeline</h3>
+      <div className="overflow-hidden rounded-lg border border-border bg-card">
+        <div className="flex items-center gap-2 border-b border-border p-4">
+          <FileText className="h-4 w-4 text-muted-foreground" />
+          <h3 className="font-semibold">Activity Timeline</h3>
         </div>
-        <div className="relative px-4 py-6">
-          <div className="absolute left-9 top-0 bottom-0 w-px bg-border" />
-          <div className="space-y-4">
-            {filtered.map(log => {
-              const config = actionConfig[log.action] || actionConfig.update
-              const ActionIcon = config.icon
-              const { date, time } = formatTimestamp(log.changedAt)
-              const initials = log.user.split(" ").map(n => n[0]).join("")
-              return (
-                <div key={log.id} className="relative flex gap-4">
-                  <div className={cn("relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border", config.bg)}>
-                    <ActionIcon className={cn("w-5 h-5", config.color)} />
-                  </div>
-                  <div className="flex-1 bg-secondary/30 rounded-lg p-4 border border-border/50">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-secondary to-card flex items-center justify-center text-xs font-medium border border-border">{initials}</div>
-                        <div>
-                          <p className="font-medium">{log.user}</p>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span className={cn("text-xs px-2 py-0.5 rounded", config.bg, config.color)}>{config.label}</span>
-                            <span className="text-sm text-muted-foreground">{log.airline}</span>
+
+        {filtered.length === 0 ? (
+          <div className="py-16 text-center">
+            <Search className="mx-auto mb-3 h-10 w-10 text-muted-foreground/30" />
+            <p className="text-sm text-muted-foreground">
+              No logs match your criteria
+            </p>
+          </div>
+        ) : (
+          <div className="relative px-4 py-6">
+            <div className="absolute bottom-0 left-9 top-0 w-px bg-border" />
+            <div className="space-y-4">
+              {filtered.map((log) => {
+                const key = getActionKey(log.action)
+                const config = actionConfig[key] || actionConfig.update
+                const ActionIcon = config.icon
+                const { date, time } = formatTimestamp(log.changedAt)
+                const initials = log.user.displayName
+                  .split(" ")
+                  .map((n) => n[0])
+                  .join("")
+                  .toUpperCase()
+                const airline = log.scorecard?.airline?.name
+
+                return (
+                  <div key={log.id} className="relative flex gap-4">
+                    <div
+                      className={cn(
+                        "relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border",
+                        config.bg
+                      )}
+                    >
+                      <ActionIcon
+                        className={cn("h-5 w-5", config.color)}
+                      />
+                    </div>
+                    <div className="flex-1 rounded-lg border border-border/50 bg-secondary/30 p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-secondary text-xs font-medium">
+                            {initials}
+                          </div>
+                          <div>
+                            <p className="font-medium">
+                              {log.user.displayName}
+                            </p>
+                            <div className="mt-0.5 flex items-center gap-2">
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "text-[10px]",
+                                  config.bg,
+                                  config.color
+                                )}
+                              >
+                                {config.label}
+                              </Badge>
+                              {airline && (
+                                <span className="text-sm text-muted-foreground">
+                                  {airline}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground font-mono">
-                        <Clock className="w-3 h-3" /> <span>{date}</span> <span className="text-muted-foreground/50">at</span> <span>{time}</span>
-                      </div>
-                    </div>
-                    {log.fieldChanged && (
-                      <div className="mt-3 p-3 bg-background/50 rounded-lg">
-                        <p className="text-xs text-muted-foreground mb-2">Changed: <span className="text-foreground">{log.fieldChanged}</span></p>
-                        <div className="flex items-center gap-2">
-                          {log.oldValue && <span className="px-2 py-1 rounded text-xs bg-red-500/10 text-red-400 border border-red-500/20">{log.oldValue}</span>}
-                          {log.oldValue && log.newValue && <ArrowRight className="w-4 h-4 text-muted-foreground/50" />}
-                          {log.newValue && <span className="px-2 py-1 rounded text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">{log.newValue}</span>}
+                        <div className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
+                          <Clock className="h-3 w-3" />
+                          {date} at {time}
                         </div>
                       </div>
-                    )}
-                    {!log.fieldChanged && (log.oldValue || log.newValue) && <p className="mt-2 text-sm text-muted-foreground">{log.oldValue || log.newValue}</p>}
+
+                      {log.fieldChanged && (
+                        <div className="mt-3 rounded-lg bg-background/50 p-3">
+                          <p className="mb-2 text-xs text-muted-foreground">
+                            Field:{" "}
+                            <span className="text-foreground">
+                              {log.fieldChanged}
+                            </span>
+                          </p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {log.oldValue && (
+                              <span className="rounded border border-red-500/20 bg-red-500/10 px-2 py-1 text-xs text-red-400">
+                                {log.oldValue}
+                              </span>
+                            )}
+                            {log.oldValue && log.newValue && (
+                              <ArrowRight className="h-4 w-4 text-muted-foreground/50" />
+                            )}
+                            {log.newValue && (
+                              <span className="rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-xs text-emerald-400">
+                                {log.newValue}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {!log.fieldChanged &&
+                        (log.oldValue || log.newValue) && (
+                          <p className="mt-2 text-sm text-muted-foreground">
+                            {log.oldValue || log.newValue}
+                          </p>
+                        )}
+                    </div>
                   </div>
-                </div>
-              )
-            })}
-          </div>
-          {filtered.length === 0 && (
-            <div className="text-center py-12">
-              <Search className="w-12 h-12 mx-auto mb-4 text-muted-foreground/30" />
-              <p className="text-sm text-muted-foreground">No logs match your search criteria</p>
+                )
+              })}
             </div>
-          )}
-        </div>
+          </div>
+        )}
+
+        {/* Pagination */}
         {totalPages > 1 && (
-          <div className="p-4 border-t border-border flex justify-center gap-2">
-            {page > 1 && <Link href={`/admin/audit-log?page=${page - 1}`}><Button variant="outline" size="sm" className="border-border text-muted-foreground">Previous</Button></Link>}
-            <span className="text-sm text-muted-foreground flex items-center px-3">Page {page} of {totalPages}</span>
-            {page < totalPages && <Link href={`/admin/audit-log?page=${page + 1}`}><Button variant="outline" size="sm" className="border-border text-muted-foreground">Next</Button></Link>}
+          <div className="flex items-center justify-center gap-3 border-t border-border p-4">
+            {page > 1 ? (
+              <Link href={`/admin/audit-log?page=${page - 1}`}>
+                <Button variant="outline" size="sm">
+                  Previous
+                </Button>
+              </Link>
+            ) : (
+              <Button variant="outline" size="sm" disabled>
+                Previous
+              </Button>
+            )}
+            <span className="tabular-nums text-sm text-muted-foreground">
+              Page {page} of {totalPages}
+            </span>
+            {page < totalPages ? (
+              <Link href={`/admin/audit-log?page=${page + 1}`}>
+                <Button variant="outline" size="sm">
+                  Next
+                </Button>
+              </Link>
+            ) : (
+              <Button variant="outline" size="sm" disabled>
+                Next
+              </Button>
+            )}
           </div>
         )}
       </div>

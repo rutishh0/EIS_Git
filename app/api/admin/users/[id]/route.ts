@@ -27,9 +27,16 @@ export async function PATCH(
     if (body.email !== undefined) updateData.email = body.email || null;
     if (body.role !== undefined) updateData.role = body.role;
     if (body.isActive !== undefined) updateData.isActive = body.isActive;
+    if (body.jobTitle !== undefined) updateData.jobTitle = body.jobTitle || null;
 
     if (body.password) {
       updateData.passwordHash = await bcrypt.hash(body.password, 12);
+    }
+
+    if (Array.isArray(body.managedAirlineIds)) {
+      updateData.managedAirlines = {
+        set: body.managedAirlineIds.map((airlineId: string) => ({ id: airlineId })),
+      };
     }
 
     const user = await prisma.user.update({
@@ -40,9 +47,11 @@ export async function PATCH(
         username: true,
         displayName: true,
         email: true,
+        jobTitle: true,
         role: true,
         isActive: true,
         createdAt: true,
+        managedAirlines: { select: { id: true, name: true } },
       },
     });
 
